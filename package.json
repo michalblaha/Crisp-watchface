@@ -1,0 +1,65 @@
+{
+  "name": "crisp",
+  "author": "Michal Bláha",
+  "version": "1.1.0",
+  "keywords": ["pebble-app"],
+  "private": true,
+  "dependencies": {
+    "@rebble/clay": "^1.0.10"
+  },
+  "pebble": {
+    "displayName": "Crisp",
+    "uuid": "ffd00ecb-81e8-4d9b-9111-4641bb1c8ff9",
+    "sdkVersion": "3",
+    "enableMultiJS": true,
+    "targetPlatforms": [
+      "aplite",
+      "basalt",
+      "chalk",
+      "diorite",
+      "emery",
+      "flint",
+      "gabbro"
+    ],
+    "watchapp": {
+      "watchface": true
+    },
+    "capabilities": [
+      "configurable",
+      "location"
+    ],
+    "messageKeys": [
+      "DATE",
+      "DAY",
+      "BT",
+      "BATTERY",
+      "SECOND_HAND",
+      "HOUR_MARKERS_COLOR",
+      "MINUTE_MARKERS_COLOR",
+      "CHARGING_MARKERS_COLOR",
+      "HANDS_COLOR",
+      "TIPS_COLOR",
+      "SECOND_HAND_COLOR",
+      "SECOND_TIP_COLOR",
+      "CALENDAR_DAY_COLOR",
+      "CORNER_TL",
+      "CORNER_TR",
+      "CORNER_BL",
+      "CORNER_BR",
+      "TEMP_UNIT",
+      "WEATHER_TEMP_MIN",
+      "WEATHER_TEMP_MAX",
+      "WEATHER_PRECIP"
+    ],
+    "resources": {
+      "media": [
+        {
+          "type": "png",
+          "name": "MENU_IMAGE",
+          "file": "images/MenuImage_BW.png",
+          "menuIcon": true
+        }
+      ]
+    }
+  }
+}

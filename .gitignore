@@ -1,0 +1,13 @@
+
+# Ignore build generated files
+build
+
+.lock-waf*
+releases
+assets
+
+# Node / npm (Clay dependency)
+node_modules
+
+# macOS
+.DS_Store
