@@ -44,6 +44,17 @@ module.exports = [
         "defaultValue": "Display"
       },
       {
+        "type": "select",
+        "messageKey": "THEME",
+        "label": "Theme",
+        "description": "Light inverts the background and text. Each theme remembers its own accent colors (set below).",
+        "defaultValue": "0",
+        "options": [
+          { "label": "Dark", "value": "0" },
+          { "label": "Light", "value": "1" }
+        ]
+      },
+      {
         "type": "toggle",
         "messageKey": "DATE",
         "label": "Show weekday & month",
@@ -112,6 +123,10 @@ module.exports = [
         "defaultValue": "Colors"
       },
       {
+        "type": "text",
+        "defaultValue": "These accents are remembered per theme: switching the theme above loads that theme's own colors."
+      },
+      {
         "type": "color",
         "messageKey": "HOUR_MARKERS_COLOR",
         "label": "Hour markers",
@@ -166,11 +181,24 @@ module.exports = [
         "label": "Day of month",
         "defaultValue": "ffff00",
         "sunlight": false
+      },
+      {
+        // Resets the pickers above to the current theme's default palette
+        // (handled in custom-clay.js; no messageKey, nothing sent on its own).
+        "type": "button",
+        "id": "resetColors",
+        "defaultValue": "Reset colors to theme defaults",
+        "primary": false
       }
     ]
   },
   {
     "type": "submit",
     "defaultValue": "Save"
+  },
+  {
+    // Shown under the Save button. Keep in sync with "version" in package.json.
+    "type": "text",
+    "defaultValue": "Crisp v1.2.0"
   }
 ];

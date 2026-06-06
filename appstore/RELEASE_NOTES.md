@@ -3,6 +3,17 @@
 Short text for the "release notes" field when publishing a version on the
 Pebble / Rebble appstore. See `../CHANGELOG.md` for the full history.
 
+## v1.2.0
+
+A light theme and easier color setup:
+
+- New: Dark / Light theme switch - Light flips the dial to a white background
+  with dark markers and text.
+- New: each theme keeps its own accent colors, so Dark and Light can look
+  completely different.
+- New: a "Reset colors to theme defaults" button, and the app version now shows
+  on the config page.
+
 ## v1.1.0
 
 Now called Crisp, with live info in every corner:

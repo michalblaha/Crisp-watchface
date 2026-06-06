@@ -4,6 +4,29 @@ All notable changes to Crisp are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] - 2026-06-06
+
+Added a light theme and made the color setup friendlier.
+
+### Added
+
+- **Dark / Light theme** toggle on the config page. Light inverts the panel
+  background, the date and corner text, the black-and-white marker/hand fallback
+  and the structural fills (the spent battery segment and the hollow disconnect
+  cap). Dark stays the default.
+- **Per-theme accent palettes**: each theme remembers its own marker, hand,
+  second-hand and day-of-month colors, seeded with defaults tuned for that
+  background. Switching the theme loads that theme's palette, so customizing one
+  never disturbs the other.
+- **Reset colors** button that restores the active theme's default palette.
+- The app version is shown under the Save button on the config page.
+
+### Notes
+
+- The theme switch and per-theme palette memory are handled on the phone (Clay);
+  the watch always holds the active palette, so the face stays fully configured
+  offline.
+
 ## [1.1.0] - 2026-06-06
 
 Renamed to **Crisp** and turned the dial's empty space into live information.

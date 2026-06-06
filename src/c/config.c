@@ -4,6 +4,7 @@ static bool s_arr[NUM_SETTINGS];
 static uint32_t s_colors[NUM_COLORS];
 static int s_corners[NUM_CORNERS];
 static int s_temp_unit;
+static int s_theme;
 static int s_weather_temp_min;
 static int s_weather_temp_max;
 static int s_weather_precip;
@@ -22,6 +23,8 @@ void config_init() {
     persist_write_bool(PERSIST_KEY_SECOND_HAND, false);
     // Temperature unit follows the watch's measurement system by default.
     persist_write_int(PERSIST_KEY_TEMP_UNIT, TEMP_UNIT_AUTO);
+    // Ship the dark theme; the accent defaults below are tuned for it.
+    persist_write_int(PERSIST_KEY_THEME, THEME_DARK);
 
     persist_write_int(PERSIST_KEY_COLOR_OFFSET + PERSIST_KEY_HOUR_MARKERS_COLOR, 0xFFFFFF);
     persist_write_int(PERSIST_KEY_COLOR_OFFSET + PERSIST_KEY_MINUTE_MARKERS_COLOR, 0xAAAAAA);
@@ -53,6 +56,7 @@ void config_init() {
   }
 
   s_temp_unit = persist_read_int(PERSIST_KEY_TEMP_UNIT);
+  s_theme     = persist_read_int(PERSIST_KEY_THEME);
 
   s_weather_valid    = persist_read_bool(PERSIST_KEY_WEATHER_VALID);
   s_weather_temp_min = persist_read_int(PERSIST_KEY_WEATHER_TEMP_MIN);
@@ -74,6 +78,10 @@ int config_get_corner(int corner_index) {
 
 int config_get_temp_unit(void) {
   return s_temp_unit;
+}
+
+int config_get_theme(void) {
+  return s_theme;
 }
 
 bool config_get_weather_valid(void) {

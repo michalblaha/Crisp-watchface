@@ -13,6 +13,9 @@ int config_get_corner(int corner_index);
 // Temperature unit selection (TEMP_UNIT_AUTO / CELSIUS / FAHRENHEIT).
 int config_get_temp_unit(void);
 
+// Active color theme (THEME_DARK / THEME_LIGHT).
+int config_get_theme(void);
+
 // Latest weather sample relayed by the phone.
 bool config_get_weather_valid(void);
 int config_get_weather_temp_min(void);

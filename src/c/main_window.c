@@ -17,6 +17,27 @@ static AppTimer *s_anim_timer;
 static void corners_update(void);
 static void corners_rebuild(void);
 
+// Theme-driven structural colors. The eight user accent colors are unaffected;
+// these only cover what used to be hardcoded black/white: the panel background,
+// the date/corner text, the B&W marker/hand fallback, and the fills that must
+// read as "the background" (empty battery segment, hollow disconnect cap).
+static GColor theme_bg(void) {
+  return (config_get_theme() == THEME_LIGHT) ? GColorWhite : GColorBlack;
+}
+
+static GColor theme_fg(void) {
+  return (config_get_theme() == THEME_LIGHT) ? GColorBlack : GColorWhite;
+}
+
+#ifdef PBL_COLOR
+// Muted "off" color for the spent part of the battery gauge on color displays:
+// dark gray on a black panel, light gray on a white one. (On B&W the empty
+// segment blends into the background instead, so this is unused there.)
+static GColor theme_battery_empty(void) {
+  return (config_get_theme() == THEME_LIGHT) ? GColorLightGray : GColorDarkGray;
+}
+#endif
+
 // Runtime layout, derived once from the display size so everything scales
 // across platforms (emery 200x228 rect, gabbro 260x260 round, classic 144x168).
 typedef struct {
@@ -308,7 +329,7 @@ static void bg_update_proc(Layer *layer, GContext *ctx) {
       ? GColorFromHEX(config_get_color(PERSIST_KEY_HOUR_MARKERS_COLOR))
       : GColorFromHEX(config_get_color(PERSIST_KEY_MINUTE_MARKERS_COLOR));
 #else
-    GColor marker_color = GColorWhite;
+    GColor marker_color = theme_fg();
 #endif
 
     GColor draw_color = marker_color;
@@ -319,11 +340,12 @@ static void bg_update_proc(Layer *layer, GContext *ctx) {
           ? GColorFromHEX(config_get_color(PERSIST_KEY_CHARGING_MARKERS_COLOR))
           : marker_color;
 #else
-        draw_color = GColorWhite;
+        draw_color = theme_fg();
 #endif
       } else {
-        // Empty battery segment: dark on color, hidden on B&W.
-        draw_color = PBL_IF_COLOR_ELSE(GColorDarkGray, GColorBlack);
+        // Empty battery segment: muted gray on color, blended into the panel
+        // background (invisible) on B&W.
+        draw_color = PBL_IF_COLOR_ELSE(theme_battery_empty(), theme_bg());
       }
     }
 
@@ -376,10 +398,10 @@ static void draw_proc(Layer *layer, GContext *ctx) {
   GColor second_color = GColorFromHEX(config_get_color(PERSIST_KEY_SECOND_HAND_COLOR));
   GColor second_tip_color = GColorFromHEX(config_get_color(PERSIST_KEY_SECOND_TIP_COLOR));
 #else
-  GColor hands_color = GColorWhite;
-  GColor tips_color = GColorWhite;
-  GColor second_color = GColorWhite;
-  GColor second_tip_color = GColorWhite;
+  GColor hands_color = theme_fg();
+  GColor tips_color = theme_fg();
+  GColor second_color = theme_fg();
+  GColor second_tip_color = theme_fg();
 #endif
 
   int tip_len = s_layout.margin;
@@ -398,9 +420,10 @@ static void draw_proc(Layer *layer, GContext *ctx) {
   graphics_context_set_fill_color(ctx, tips_color);
   graphics_fill_circle(ctx, s_layout.center, s_layout.center_dot);
 
-  // Hollow the cap to signal a dropped Bluetooth connection.
+  // Hollow the cap to signal a dropped Bluetooth connection (punch the panel
+  // background through the cap).
   if(config_get(PERSIST_KEY_BT) && !s_connected) {
-    graphics_context_set_fill_color(ctx, GColorBlack);
+    graphics_context_set_fill_color(ctx, theme_bg());
     graphics_fill_circle(ctx, s_layout.center, s_layout.center_dot - 1);
   }
 }
@@ -448,7 +471,7 @@ static void window_load(Window *window) {
   s_weekday_layer = text_layer_create(GRect(block_x, day_y - label_h, block_w, label_h));
   text_layer_set_text_alignment(s_weekday_layer, GTextAlignmentCenter);
   text_layer_set_font(s_weekday_layer, fonts_get_system_font(label_font));
-  text_layer_set_text_color(s_weekday_layer, GColorWhite);
+  text_layer_set_text_color(s_weekday_layer, theme_fg());
   text_layer_set_background_color(s_weekday_layer, GColorClear);
 
   s_day_in_month_layer = text_layer_create(GRect(block_x, day_y, block_w, day_h));
@@ -457,14 +480,14 @@ static void window_load(Window *window) {
 #ifdef PBL_COLOR
   text_layer_set_text_color(s_day_in_month_layer, GColorFromHEX(config_get_color(PERSIST_KEY_CALENDAR_DAY_COLOR)));
 #else
-  text_layer_set_text_color(s_day_in_month_layer, GColorWhite);
+  text_layer_set_text_color(s_day_in_month_layer, theme_fg());
 #endif
   text_layer_set_background_color(s_day_in_month_layer, GColorClear);
 
   s_month_layer = text_layer_create(GRect(block_x, day_y + day_h, block_w, label_h));
   text_layer_set_text_alignment(s_month_layer, GTextAlignmentCenter);
   text_layer_set_font(s_month_layer, fonts_get_system_font(label_font));
-  text_layer_set_text_color(s_month_layer, GColorWhite);
+  text_layer_set_text_color(s_month_layer, theme_fg());
   text_layer_set_background_color(s_month_layer, GColorClear);
 
   if(config_get(PERSIST_KEY_DAY)) {
@@ -505,7 +528,7 @@ static void window_load(Window *window) {
       ? GTextAlignmentRight : GTextAlignmentLeft;
     text_layer_set_text_alignment(s_corner_layer[i], align);
     text_layer_set_font(s_corner_layer[i], fonts_get_system_font(corner_font));
-    text_layer_set_text_color(s_corner_layer[i], GColorWhite);
+    text_layer_set_text_color(s_corner_layer[i], theme_fg());
     text_layer_set_background_color(s_corner_layer[i], GColorClear);
   }
   corners_rebuild();
@@ -553,7 +576,7 @@ static void hands_update(Animation *anim, AnimationProgress dist_normalized) {
 
 void main_window_push() {
   s_main_window = window_create();
-  window_set_background_color(s_main_window, GColorBlack);
+  window_set_background_color(s_main_window, theme_bg());
   window_set_window_handlers(s_main_window, (WindowHandlers) {
     .load = window_load,
     .unload = window_unload,
@@ -599,6 +622,23 @@ void main_window_refresh(void) {
   subscribe_ticks();
   corners_rebuild();
   corners_update();
+
+  // A theme switch flips the panel background and the text colors, which were
+  // set once at window_load; re-apply them so the change shows without a
+  // relaunch. (The accent colors are read live in the draw procs below.)
+  window_set_background_color(s_main_window, theme_bg());
+  text_layer_set_text_color(s_weekday_layer, theme_fg());
+  text_layer_set_text_color(s_month_layer, theme_fg());
+#ifdef PBL_COLOR
+  text_layer_set_text_color(s_day_in_month_layer,
+                            GColorFromHEX(config_get_color(PERSIST_KEY_CALENDAR_DAY_COLOR)));
+#else
+  text_layer_set_text_color(s_day_in_month_layer, theme_fg());
+#endif
+  for(int i = 0; i < NUM_CORNERS; i++) {
+    text_layer_set_text_color(s_corner_layer[i], theme_fg());
+  }
+
   layer_mark_dirty(s_bg_layer);
   layer_mark_dirty(s_canvas_layer);
 }

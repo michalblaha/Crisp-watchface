@@ -84,6 +84,11 @@ static void in_recv_handler(DictionaryIterator *iter, void *context) {
   // Temperature unit selection (auto / Celsius / Fahrenheit).
   config_changed |= store_select(iter, MESSAGE_KEY_TEMP_UNIT, PERSIST_KEY_TEMP_UNIT);
 
+  // Color theme (dark / light). The phone sends the accent palette that matches
+  // the chosen theme in the same message, so the colors above already describe
+  // this theme.
+  config_changed |= store_select(iter, MESSAGE_KEY_THEME, PERSIST_KEY_THEME);
+
   // Weather sample relayed by the phone (separate from a config edit). When a
   // sample arrives, mark the cache valid so the corners stop showing "--".
   bool weather_changed = false;

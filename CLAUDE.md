@@ -78,11 +78,17 @@ files under `src/c/` (compiled by `wscript`, which globs `src/c/**/*.c`):
   `main_window_refresh()` (live re-apply of config without relaunch).
 - **`src/pkjs/config.js`** — the **Clay** form definition (a `module.exports`
   array). Corner selects share one `CORNER_OPTIONS` list whose string values map
-  to the `CORNER_*` enum on the watch.
-- **`src/pkjs/index.js`** — phone-side glue. Initializes Clay (which auto-sends
-  the config on save) and relays **weather**: geolocate → Open-Meteo → send
-  `WEATHER_TEMP_MIN` / `WEATHER_TEMP_MAX` / `WEATHER_PRECIP` to the watch,
-  refreshed on a timer.
+  to the `CORNER_*` enum on the watch; the `THEME` select drives the dark/light
+  theme.
+- **`src/pkjs/custom-clay.js`** — the Clay **custom function** (second arg to
+  `new Clay(...)`). Injected into the config page, it gives each theme its own
+  remembered accent palette: on a `THEME` change it stashes the current pickers
+  under the old theme and loads the new theme's saved palette from `localStorage`
+  (see Theme below). Self-contained — no references to module scope.
+- **`src/pkjs/index.js`** — phone-side glue. Initializes Clay with the custom
+  function (Clay auto-sends the config on save) and relays **weather**:
+  geolocate → Open-Meteo → send `WEATHER_TEMP_MIN` / `WEATHER_TEMP_MAX` /
+  `WEATHER_PRECIP` to the watch, refreshed on a timer.
 
 ### Settings model (persist + AppMessage)
 
@@ -102,6 +108,14 @@ without the phone:
    `health_service_get_measurement_system_for_display(HealthMetricWalkedDistanceMeters)`
    (Pebble has no dedicated temperature setting), falling back to Celsius when
    unknown or on non-`PBL_HEALTH` platforms.
+5. **Theme** (`PERSIST_KEY_THEME`, int) — `THEME_DARK` / `THEME_LIGHT`, read into
+   `s_theme`. Drives the *structural* colors only: the panel background, the
+   date/corner text, the B&W marker/hand fallback, the spent battery segment and
+   the hollow disconnect cap — everything that used to be hardcoded black/white,
+   now routed through `theme_bg()` / `theme_fg()` in `main_window.c`. The eight
+   user accent colors are unaffected; the phone remembers a separate accent
+   palette per theme (see Theme below) and resends the matching one on switch, so
+   the watch only ever holds the active palette.
 
 Plus a cached **weather sample** (`PERSIST_KEY_WEATHER_TEMP_MIN/MAX/PRECIP/VALID`) that
 the weather/precip corners read; it survives a relaunch until the next refresh.
@@ -113,7 +127,28 @@ display time (`weather_use_fahrenheit` / `celsius_to_fahrenheit` in
 `src/c/config.c` (the first-launch seed) and the `defaultValue`s in
 `src/pkjs/config.js` (the Clay form). The shipped defaults: date + day on,
 battery + disconnect indicator on, **second hand off**, temperature unit
-Automatic, and corners = battery (TL) / heart rate (TR) / steps (BL) / weather (BR).
+Automatic, **theme Dark**, and corners = battery (TL) / heart rate (TR) /
+steps (BL) / weather (BR).
+
+### Theme (dark / light) and per-theme palettes
+
+The `THEME` setting flips only the structural colors (see point 5 above);
+switching it live re-applies the panel background and the date/corner text colors
+in `main_window_refresh()` (they are otherwise set once at `window_load`). The
+eight accent colors stay user-controlled, but each theme keeps its **own** accent
+palette — and that memory lives on the phone, since a theme can only ever be
+changed from the config page anyway. `src/pkjs/custom-clay.js` (the Clay custom
+function, passed as the second arg to `new Clay(...)` in `index.js`) stashes the
+current pickers under the old theme in `localStorage` and loads the new theme's
+saved palette (seeded from per-theme defaults the first time) whenever the Theme
+select changes, so the submit hands the watch the palette that matches the chosen
+theme. A **Reset colors** button (Clay `button` with `id: "resetColors"`, no
+messageKey) restores the pickers to the active theme's default palette. The dark
+accent defaults mirror `config.c` / `config.js`; the light defaults (dark
+markers/hands, sturdier accents that survive a white panel) live only in
+`custom-clay.js`. Clay color pickers expose values as **integers** via `get()`
+(hex strings via `set()`), so `custom-clay.js` normalizes to hex strings before
+storing.
 
 ### Corner readouts
 
@@ -129,7 +164,8 @@ displays but pushed inward on `PBL_ROUND` so the bezel does not clip the text.
 
 ### Conditional compilation
 
-- `#ifdef PBL_COLOR` — colored markers/hands; B&W platforms force white.
+- `#ifdef PBL_COLOR` — colored markers/hands; B&W platforms fall back to the
+  theme foreground (`theme_fg()`: white on dark, black on light).
 - `#if defined(PBL_HEALTH)` — heart-rate / steps corners and the
   `health_service_events_subscribe` handler. Without it those corners show `--`.
 - `#ifdef PBL_ROUND` — pushes the corner boxes inward (round bezel clipping).
@@ -156,7 +192,7 @@ Config travels as one AppMessage with **named** `messageKeys` declared in
 strings, weather as ints. **Changing the key list requires `pebble clean`** (the
 `MESSAGE_KEY_*` macros are generated from `package.json`). Current keys: `DATE`,
 `DAY`, `BT`, `BATTERY`, `SECOND_HAND`, the eight `*_COLOR` keys,
-`CORNER_TL/TR/BL/BR`, `TEMP_UNIT`, and
+`CORNER_TL/TR/BL/BR`, `TEMP_UNIT`, `THEME`, and
 `WEATHER_TEMP_MIN`/`WEATHER_TEMP_MAX`/`WEATHER_PRECIP`.
 
 AppMessage buffers are fixed sizes (`APP_MESSAGE_INBOX_SIZE` /

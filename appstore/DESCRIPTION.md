@@ -30,9 +30,11 @@ Make it yours:
 - Optional second hand, off by default to save battery.
 - Optional date block: weekday, day of the month and month.
 - A battery gauge drawn straight onto the hour markers.
+- Dark or light theme. Light flips the dial to a white background with dark
+  markers and text, and each theme keeps its own set of accent colors.
 - Recolor every element: hour markers, minute markers, charging markers, the
   hour and minute hands, the hand tips and center, the second hand and its tip,
-  and the day of the month.
+  and the day of the month. A reset button restores the theme's defaults.
 - Disconnection indicator: the center cap hollows out when your phone is out of
   range.
 - A smooth sweep animation when the face loads.
@@ -47,6 +49,7 @@ Configuration is built in via Clay; no website or account is required.
 ## Notes for the submission form
 
 - Category: Watchfaces
-- Built for: aplite, basalt, chalk, diorite, emery, flint, gabbro
+- Built for: Pebble Classic, Pebble Steel, Pebble Time, Pebble Time Steel,
+  Pebble Time Round, Pebble 2, Pebble 2 Duo, Pebble Time 2, Pebble Round 2
 - Capabilities: configurable, location (weather)
 - No emoji in the store text (kept plain for readability across the appstore UI).

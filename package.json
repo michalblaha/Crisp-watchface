@@ -1,7 +1,7 @@
 {
   "name": "crisp",
   "author": "Michal Bláha",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "keywords": ["pebble-app"],
   "private": true,
   "dependencies": {
@@ -47,6 +47,7 @@
       "CORNER_BL",
       "CORNER_BR",
       "TEMP_UNIT",
+      "THEME",
       "WEATHER_TEMP_MIN",
       "WEATHER_TEMP_MAX",
       "WEATHER_PRECIP"

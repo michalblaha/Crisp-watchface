@@ -51,8 +51,9 @@
 
 #define PERSIST_DEFAULTS_SET 3489
 
-// AppMessage buffers. The config payload is 13 keys (5 toggles + 8 colors),
-// ~150 bytes; we never send anything back. Requesting fixed, sized buffers
+// AppMessage buffers. The config payload is 19 keys (5 toggles + 8 colors + 4
+// corners + temp unit + theme), ~200 bytes; we never send anything back.
+// Requesting fixed, sized buffers
 // instead of app_message_*_size_maximum() keeps the app within aplite's small
 // RAM budget (the maximum-size request hangs the app there).
 #define APP_MESSAGE_INBOX_SIZE  256
@@ -73,6 +74,16 @@
 #define TEMP_UNIT_AUTO         0
 #define TEMP_UNIT_CELSIUS      1
 #define TEMP_UNIT_FAHRENHEIT   2
+
+// Color theme of the dial. DARK (the shipped default) draws light markers/text
+// on a black panel; LIGHT inverts the background and the structural colors (the
+// text, the B&W marker/hand fallback, the empty battery segment and the hollow
+// disconnect cap). The eight user accent colors stay user-controlled; the phone
+// (Clay) remembers a separate accent palette per theme and resends the matching
+// one on switch, so the watch only ever holds the active palette.
+#define PERSIST_KEY_THEME      7
+#define THEME_DARK             0
+#define THEME_LIGHT            1
 
 // Persist keys for the colors, stored at PERSIST_KEY_COLOR_OFFSET + index.
 #define PERSIST_KEY_COLOR_OFFSET          10
