@@ -1,7 +1,7 @@
 {
   "name": "crisp",
   "author": "Michal Bláha",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "keywords": ["pebble-app"],
   "private": true,
   "dependencies": {
@@ -34,6 +34,7 @@
       "BT",
       "BATTERY",
       "SECOND_HAND",
+      "HR_INDICATOR",
       "HOUR_MARKERS_COLOR",
       "MINUTE_MARKERS_COLOR",
       "CHARGING_MARKERS_COLOR",

@@ -74,6 +74,13 @@ module.exports = [
       },
       {
         "type": "toggle",
+        "messageKey": "HR_INDICATOR",
+        "label": "Show heart rate indicator",
+        "description": "Shows a heart above the center while the watch measures your heart rate; two hearts during a workout.",
+        "defaultValue": true
+      },
+      {
+        "type": "toggle",
         "messageKey": "BATTERY",
         "label": "Show battery on hour markers",
         "defaultValue": true
@@ -199,6 +206,6 @@ module.exports = [
   {
     // Shown under the Save button. Keep in sync with "version" in package.json.
     "type": "text",
-    "defaultValue": "Crisp v1.2.0"
+    "defaultValue": "Crisp v1.3.0"
   }
 ];

@@ -4,6 +4,31 @@ All notable changes to Crisp are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.3.0] - 2026-06-09
+
+Added a heart-rate indicator and made the dial adapt to Timeline Quick View.
+
+### Added
+
+- **Heart-rate indicator**: one heart above the center while the watch is
+  sampling your heart rate, two while it samples intensively during a workout
+  (run / open workout). Held briefly after the last sample, then cleared.
+- **Heart rate indicator** toggle on the config page (on by default), seeded for
+  existing installs too so upgraders get it without resetting their settings.
+
+### Changed
+
+- The dial now reacts to **Timeline Quick View**: when the peek slides up from
+  the bottom, the whole face lifts and tightens into the visible area so it stays
+  a complete circle and the bottom corner readouts stay on screen.
+
+### Notes
+
+- The heart-rate indicator needs a health-capable Pebble; it is absent on models
+  without the sensor. "Intensive" follows the watch's current workout activity.
+- Round displays do not show Timeline Quick View, so the lift only applies to
+  rectangular models.
+
 ## [1.2.0] - 2026-06-06
 
 Added a light theme and made the color setup friendlier.

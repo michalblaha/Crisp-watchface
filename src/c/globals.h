@@ -20,8 +20,34 @@
 #define LAYOUT_BASE_TICK_MIN   6
 #define LAYOUT_BASE_CENTER     4
 
+// Heart-rate indicator: one (measuring) or two (intensive / workout) small
+// hearts drawn just above the center cap while the watch is sampling the heart
+// rate. Sizes are proportions against the 72px baseline, like the rest of the
+// dial. HALFW is half the heart's width; GAP is both the lift above the center
+// cap and the spacing between the two hearts. The heart reads red on color
+// displays and falls back to the theme foreground on B&W.
+#define LAYOUT_BASE_HEART_HALFW 8
+#define LAYOUT_BASE_HEART_GAP   3
+#define HR_HEART_COLOR_HEX      0xFF0000
+// How long a heart stays shown after the last HeartRateUpdate before it is
+// assumed the watch stopped measuring (updates arrive ~1/s while measuring).
+#define HR_ACTIVE_WINDOW_MS  8000
+
 // Above this inscribed radius the larger system fonts are used for the date.
 #define LAYOUT_BIG_RADIUS_THRESHOLD 90
+
+// Date block geometry. Heights switch with the big/small font set; the block is
+// anchored to the right of the dial center and vertically centered on it. The
+// width and the horizontal offset from center are fractions of the display
+// width (expressed against the 144px baseline).
+#define LAYOUT_DATE_DAY_H_BIG     34
+#define LAYOUT_DATE_DAY_H_SMALL   28
+#define LAYOUT_DATE_LABEL_H_BIG   22
+#define LAYOUT_DATE_LABEL_H_SMALL 18
+#define LAYOUT_DATE_BLOCK_W_NUM   44
+#define LAYOUT_DATE_BLOCK_W_DEN  144
+#define LAYOUT_DATE_BLOCK_X_NUM   18
+#define LAYOUT_DATE_BLOCK_X_DEN  144
 
 // Corner readout boxes. Width is a fraction of the display width. On a
 // rectangular panel the boxes sit in the true corners (a small scaled gap from
@@ -65,7 +91,9 @@
 #define PERSIST_KEY_BT          2
 #define PERSIST_KEY_BATTERY     3
 #define PERSIST_KEY_SECOND_HAND 4
-#define NUM_SETTINGS            5
+// Show the heart(s) above the center while the watch is measuring heart rate.
+#define PERSIST_KEY_HR_INDICATOR 5
+#define NUM_SETTINGS            6
 
 // Temperature unit for the weather corner, stored as its own int (not a bool).
 // AUTO follows the watch's metric/imperial preference when the platform exposes

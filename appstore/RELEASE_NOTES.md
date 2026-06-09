@@ -3,6 +3,16 @@
 Short text for the "release notes" field when publishing a version on the
 Pebble / Rebble appstore. See `../CHANGELOG.md` for the full history.
 
+## v1.3.0
+
+Your heart rate at a glance, and a tidier timeline:
+
+- New: a heart shows above the center while your watch reads your heart rate -
+  two of them during a workout, when it checks more often.
+- New: the dial lifts and shrinks to stay fully visible when Timeline Quick View
+  slides up from the bottom of the screen.
+- New: turn the heart rate indicator on or off from the config page.
+
 ## v1.2.0
 
 A light theme and easier color setup:

@@ -21,6 +21,9 @@ void config_init() {
     persist_write_bool(PERSIST_KEY_BATTERY, true);
     // Second hand ships disabled; the wearer opts in from the config page.
     persist_write_bool(PERSIST_KEY_SECOND_HAND, false);
+    // Show the heart(s) above the center while a heart-rate sample is in
+    // progress; unobtrusive (only visible during measurement), so on by default.
+    persist_write_bool(PERSIST_KEY_HR_INDICATOR, true);
     // Temperature unit follows the watch's measurement system by default.
     persist_write_int(PERSIST_KEY_TEMP_UNIT, TEMP_UNIT_AUTO);
     // Ship the dark theme; the accent defaults below are tuned for it.
@@ -41,6 +44,14 @@ void config_init() {
     persist_write_int(PERSIST_KEY_CORNER_OFFSET + CORNER_POS_TR, CORNER_HEART_RATE);
     persist_write_int(PERSIST_KEY_CORNER_OFFSET + CORNER_POS_BL, CORNER_STEPS);
     persist_write_int(PERSIST_KEY_CORNER_OFFSET + CORNER_POS_BR, CORNER_WEATHER);
+  }
+
+  // Migration: the heart-rate indicator toggle was added after the first
+  // release, so installs that already have the defaults flag set never got its
+  // seed (an unset bool reads back false). Seed it once for them too, so it
+  // ships on by default for upgraders as well as fresh installs.
+  if(!persist_exists(PERSIST_KEY_HR_INDICATOR)) {
+    persist_write_bool(PERSIST_KEY_HR_INDICATOR, true);
   }
 
   for(int i = 0; i < NUM_SETTINGS; i++) {

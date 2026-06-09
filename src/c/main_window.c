@@ -12,10 +12,28 @@ static char s_corner_buffer[NUM_CORNERS][12];
 static Time s_last_time, s_anim_time;
 static char s_weekday_buffer[8], s_month_buffer[8], s_day_in_month_buffer[3];
 static bool s_animating, s_connected;
+// Whether the big font set is in use. Captured once from the full-screen radius
+// at window_load so a Timeline Quick View peek (which shrinks the working area)
+// never flips the date/corner fonts mid-animation.
+static bool s_big;
 static AppTimer *s_anim_timer;
+
+#if defined(PBL_HEALTH)
+// Heart-rate indicator state. s_hr_active is held true for HR_ACTIVE_WINDOW_MS
+// after each HeartRateUpdate (the sensor does not signal when it stops), and
+// s_hr_intensive tracks whether that measurement is happening inside a workout.
+static bool s_hr_active, s_hr_intensive;
+static AppTimer *s_hr_off_timer;
+// A single heart silhouette as a filled GPath, sized once at window_load and
+// re-positioned with gpath_move_to for each heart drawn.
+static GPath *s_heart_path;
+static GPoint s_heart_points[14];
+static int s_heart_halfw, s_heart_gap;
+#endif
 
 static void corners_update(void);
 static void corners_rebuild(void);
+static void relayout(GRect visible);
 
 // Theme-driven structural colors. The eight user accent colors are unaffected;
 // these only cover what used to be hardcoded black/white: the panel background,
@@ -250,7 +268,46 @@ static void corners_rebuild(void) {
 }
 
 #if defined(PBL_HEALTH)
+// No event fires when the sensor stops sampling, so the indicator is held on a
+// timeout: this clears it once HR_ACTIVE_WINDOW_MS passes with no new sample.
+static void hr_off_timeout(void *data) {
+  s_hr_off_timer = NULL;
+  if(s_hr_active || s_hr_intensive) {
+    s_hr_active = false;
+    s_hr_intensive = false;
+    layer_mark_dirty(s_canvas_layer);
+  }
+}
+
+// A fresh heart-rate sample arrived: light the indicator and (re)arm the
+// timeout that turns it off when samples stop. Two hearts while in a workout
+// (the system samples the heart rate intensively during run / open workout).
+static void hr_on_sample(void) {
+  if(!config_get(PERSIST_KEY_HR_INDICATOR)) return;
+
+  time_t now = time(NULL);
+  bool available =
+    (health_service_metric_accessible(HealthMetricHeartRateBPM, now, now)
+       & HealthServiceAccessibilityMaskAvailable) != 0;
+  HealthValue bpm = health_service_peek_current_value(HealthMetricHeartRateBPM);
+  if(!available || bpm <= 0) return;
+
+  HealthActivityMask act = health_service_peek_current_activities();
+  s_hr_active = true;
+  s_hr_intensive = (act & (HealthActivityRun | HealthActivityOpenWorkout)) != 0;
+
+  if(s_hr_off_timer) {
+    app_timer_reschedule(s_hr_off_timer, HR_ACTIVE_WINDOW_MS);
+  } else {
+    s_hr_off_timer = app_timer_register(HR_ACTIVE_WINDOW_MS, hr_off_timeout, NULL);
+  }
+  layer_mark_dirty(s_canvas_layer);
+}
+
 static void health_handler(HealthEventType event, void *context) {
+  if(event == HealthEventHeartRateUpdate) {
+    hr_on_sample();
+  }
   if(event == HealthEventHeartRateUpdate ||
      event == HealthEventMovementUpdate ||
      event == HealthEventSignificantUpdate) {
@@ -371,6 +428,63 @@ static void draw_hand(GContext *ctx, int32_t angle, int length, int tip_length,
   graphics_draw_line(ctx, joint, tip);
 }
 
+#if defined(PBL_HEALTH)
+// Build the heart silhouette as a filled polygon anchored at its bottom tip
+// (0,0) with the lobes above (negative y); height ~1.9*W. W is the half-width,
+// scaled from the dial once at window_load. gpath_create keeps a reference to
+// s_heart_points, so that array must stay alive (it is static).
+static void heart_path_init(int W) {
+  if(W < 3) W = 3;
+  s_heart_halfw = W;
+  s_heart_gap = scaled(LAYOUT_BASE_HEART_GAP);
+  if(s_heart_gap < 1) s_heart_gap = 1;
+
+  const GPoint pts[14] = {
+    { 0,             0 },
+    { (6 * W) / 10,  (-7 * W) / 10 },
+    { W,             (-11 * W) / 10 },
+    { W,             (-15 * W) / 10 },
+    { (85 * W) / 100,(-18 * W) / 10 },
+    { (5 * W) / 10,  (-19 * W) / 10 },
+    { (2 * W) / 10,  (-175 * W) / 100 },
+    { 0,             (-15 * W) / 10 },
+    { (-2 * W) / 10, (-175 * W) / 100 },
+    { (-5 * W) / 10, (-19 * W) / 10 },
+    { (-85 * W) / 100,(-18 * W) / 10 },
+    { -W,            (-15 * W) / 10 },
+    { -W,            (-11 * W) / 10 },
+    { (-6 * W) / 10, (-7 * W) / 10 },
+  };
+  for(int i = 0; i < 14; i++) s_heart_points[i] = pts[i];
+
+  static GPathInfo info;
+  info.num_points = 14;
+  info.points = s_heart_points;
+  if(s_heart_path) gpath_destroy(s_heart_path);
+  s_heart_path = gpath_create(&info);
+}
+
+// Draw one (measuring) or two (intensive) hearts just above the center cap,
+// centered horizontally on the dial. Red on color displays, theme foreground
+// on B&W.
+static void draw_hr_hearts(GContext *ctx, int count) {
+  if(!s_heart_path) return;
+  graphics_context_set_fill_color(ctx, PBL_IF_COLOR_ELSE(GColorFromHEX(HR_HEART_COLOR_HEX), theme_fg()));
+
+  int tip_y = s_layout.center.y - s_layout.center_dot - s_heart_gap;
+  if(count <= 1) {
+    gpath_move_to(s_heart_path, GPoint(s_layout.center.x, tip_y));
+    gpath_draw_filled(ctx, s_heart_path);
+  } else {
+    int off = s_heart_halfw + s_heart_gap / 2;
+    gpath_move_to(s_heart_path, GPoint(s_layout.center.x - off, tip_y));
+    gpath_draw_filled(ctx, s_heart_path);
+    gpath_move_to(s_heart_path, GPoint(s_layout.center.x + off, tip_y));
+    gpath_draw_filled(ctx, s_heart_path);
+  }
+}
+#endif
+
 static void draw_proc(Layer *layer, GContext *ctx) {
   // Antialiasing only matters on the color displays (see bg_update_proc).
   graphics_context_set_antialiased(ctx, PBL_IF_COLOR_ELSE(ANTIALIASING, false));
@@ -426,6 +540,14 @@ static void draw_proc(Layer *layer, GContext *ctx) {
     graphics_context_set_fill_color(ctx, theme_bg());
     graphics_fill_circle(ctx, s_layout.center, s_layout.center_dot - 1);
   }
+
+#if defined(PBL_HEALTH)
+  // Heart-rate indicator above the center: one heart while measuring, two while
+  // measuring intensively (workout). Hidden during the launch sweep.
+  if(config_get(PERSIST_KEY_HR_INDICATOR) && s_hr_active && !s_animating) {
+    draw_hr_hearts(ctx, s_hr_intensive ? 2 : 1);
+  }
+#endif
 }
 
 static void bt_handler(bool connected) {
@@ -444,37 +566,104 @@ static void batt_handler(BatteryChargeState state) {
   layer_mark_dirty(s_canvas_layer);
 }
 
+// Recompute everything whose position depends on the working area and apply it
+// to the live layers: the dial Layout (center, radius, hand/tick lengths), the
+// date block frames and the four corner-readout frames. `visible` is the area
+// not covered by a system overlay (Timeline Quick View) — at rest it equals the
+// full window, and during a peek it is the window minus the bottom overlay, so
+// feeding it here lifts the dial up and tightens it to stay a complete circle.
+// Fonts and the big/small height switch stay fixed (driven by s_big, captured
+// from the full-screen radius) so a peek never reflows the text.
+static void relayout(GRect visible) {
+  layout_init(visible);
+
+  int day_h = s_big ? LAYOUT_DATE_DAY_H_BIG : LAYOUT_DATE_DAY_H_SMALL;
+  int label_h = s_big ? LAYOUT_DATE_LABEL_H_BIG : LAYOUT_DATE_LABEL_H_SMALL;
+  int block_w = visible.size.w * LAYOUT_DATE_BLOCK_W_NUM / LAYOUT_DATE_BLOCK_W_DEN;
+  int block_x = s_layout.center.x + visible.size.w * LAYOUT_DATE_BLOCK_X_NUM / LAYOUT_DATE_BLOCK_X_DEN;
+  if (block_x + block_w > visible.size.w) {
+    block_x = visible.size.w - block_w;
+  }
+  int day_y = s_layout.center.y - day_h / 2;
+  layer_set_frame(text_layer_get_layer(s_weekday_layer),
+                  GRect(block_x, day_y - label_h, block_w, label_h));
+  layer_set_frame(text_layer_get_layer(s_day_in_month_layer),
+                  GRect(block_x, day_y, block_w, day_h));
+  layer_set_frame(text_layer_get_layer(s_month_layer),
+                  GRect(block_x, day_y + day_h, block_w, label_h));
+
+  // Corner readouts sit in the true panel corners on rectangular displays
+  // (emery / Time 2 included). A physically round display has no corners, so
+  // there the boxes are pulled in just enough to clear the bezel — the literal
+  // corner pixels are outside the visible circle.
+  int corner_w = visible.size.w * LAYOUT_CORNER_W_NUM / LAYOUT_CORNER_W_DEN;
+  int corner_h = s_big ? LAYOUT_CORNER_H_BIG : LAYOUT_CORNER_H_SMALL;
+#ifdef PBL_ROUND
+  int inset = s_layout.radius * LAYOUT_CORNER_INSET_ROUND_NUM / LAYOUT_CORNER_INSET_ROUND_DEN;
+#else
+  int inset = scaled(LAYOUT_CORNER_INSET_RECT);
+  if(inset < 2) inset = 2;
+#endif
+  int right_x = visible.size.w - inset - corner_w;
+  int bottom_y = visible.size.h - inset - corner_h;
+  s_corner_rect[CORNER_POS_TL] = GRect(inset,   inset,    corner_w, corner_h);
+  s_corner_rect[CORNER_POS_TR] = GRect(right_x, inset,    corner_w, corner_h);
+  s_corner_rect[CORNER_POS_BL] = GRect(inset,   bottom_y, corner_w, corner_h);
+  s_corner_rect[CORNER_POS_BR] = GRect(right_x, bottom_y, corner_w, corner_h);
+  for(int i = 0; i < NUM_CORNERS; i++) {
+    layer_set_frame(text_layer_get_layer(s_corner_layer[i]), s_corner_rect[i]);
+  }
+}
+
+// A Timeline Quick View peek changed the unobstructed area. During the slide the
+// service animates layer_get_unobstructed_bounds(), so simply re-laying out from
+// it on every callback rides that animation for free. The dial layers cover the
+// whole window (not just the visible band) per the SDK rule, so only the drawn
+// geometry — not the layer frames — shrinks behind the overlay.
+static void apply_unobstructed(void) {
+  if(!s_main_window) return;
+  relayout(layer_get_unobstructed_bounds(window_get_root_layer(s_main_window)));
+  layer_mark_dirty(s_bg_layer);
+  layer_mark_dirty(s_canvas_layer);
+}
+
+static void unobstructed_change(AnimationProgress progress, void *context) {
+  apply_unobstructed();
+}
+
+static void unobstructed_did_change(void *context) {
+  apply_unobstructed();
+}
+
 static void window_load(Window *window) {
   Layer *window_layer = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(window_layer);
 
+  // Capture the big/small font choice from the FULL-screen radius so a later
+  // peek (which shrinks the dial) cannot flip the fonts mid-animation.
   layout_init(bounds);
+  s_big = s_layout.radius >= LAYOUT_BIG_RADIUS_THRESHOLD;
+
+#if defined(PBL_HEALTH)
+  // Size the heart from the full-screen dial (kept constant across a peek).
+  heart_path_init(scaled(LAYOUT_BASE_HEART_HALFW));
+#endif
 
   s_bg_layer = layer_create(bounds);
   layer_set_update_proc(s_bg_layer, bg_update_proc);
   layer_add_child(window_layer, s_bg_layer);
 
-  bool big = s_layout.radius >= LAYOUT_BIG_RADIUS_THRESHOLD;
-  const char *label_font = big ? FONT_KEY_GOTHIC_18_BOLD : FONT_KEY_GOTHIC_14_BOLD;
-  const char *day_font = big ? FONT_KEY_GOTHIC_28_BOLD : FONT_KEY_GOTHIC_24_BOLD;
+  const char *label_font = s_big ? FONT_KEY_GOTHIC_18_BOLD : FONT_KEY_GOTHIC_14_BOLD;
+  const char *day_font = s_big ? FONT_KEY_GOTHIC_28_BOLD : FONT_KEY_GOTHIC_24_BOLD;
 
-  // Date block, anchored to the right of the dial and vertically centered.
-  int block_w = bounds.size.w * 44 / 144;
-  int block_x = s_layout.center.x + bounds.size.w * 18 / 144;
-  if (block_x + block_w > bounds.size.w) {
-    block_x = bounds.size.w - block_w;
-  }
-  int day_h = big ? 34 : 28;
-  int label_h = big ? 22 : 18;
-  int day_y = s_layout.center.y - day_h / 2;
-
-  s_weekday_layer = text_layer_create(GRect(block_x, day_y - label_h, block_w, label_h));
+  // Date block (frames are set by relayout below).
+  s_weekday_layer = text_layer_create(bounds);
   text_layer_set_text_alignment(s_weekday_layer, GTextAlignmentCenter);
   text_layer_set_font(s_weekday_layer, fonts_get_system_font(label_font));
   text_layer_set_text_color(s_weekday_layer, theme_fg());
   text_layer_set_background_color(s_weekday_layer, GColorClear);
 
-  s_day_in_month_layer = text_layer_create(GRect(block_x, day_y, block_w, day_h));
+  s_day_in_month_layer = text_layer_create(bounds);
   text_layer_set_text_alignment(s_day_in_month_layer, GTextAlignmentCenter);
   text_layer_set_font(s_day_in_month_layer, fonts_get_system_font(day_font));
 #ifdef PBL_COLOR
@@ -484,7 +673,7 @@ static void window_load(Window *window) {
 #endif
   text_layer_set_background_color(s_day_in_month_layer, GColorClear);
 
-  s_month_layer = text_layer_create(GRect(block_x, day_y + day_h, block_w, label_h));
+  s_month_layer = text_layer_create(bounds);
   text_layer_set_text_alignment(s_month_layer, GTextAlignmentCenter);
   text_layer_set_font(s_month_layer, fonts_get_system_font(label_font));
   text_layer_set_text_color(s_month_layer, theme_fg());
@@ -502,28 +691,9 @@ static void window_load(Window *window) {
   layer_set_update_proc(s_canvas_layer, draw_proc);
   layer_add_child(window_layer, s_canvas_layer);
 
-  // Corner readouts sit in the true panel corners on rectangular displays
-  // (emery / Time 2 included). A physically round display has no corners, so
-  // there the boxes are pulled in just enough to clear the bezel — the literal
-  // corner pixels are outside the visible circle.
-  int corner_w = bounds.size.w * LAYOUT_CORNER_W_NUM / LAYOUT_CORNER_W_DEN;
-  int corner_h = big ? LAYOUT_CORNER_H_BIG : LAYOUT_CORNER_H_SMALL;
-#ifdef PBL_ROUND
-  int inset = s_layout.radius * LAYOUT_CORNER_INSET_ROUND_NUM / LAYOUT_CORNER_INSET_ROUND_DEN;
-#else
-  int inset = scaled(LAYOUT_CORNER_INSET_RECT);
-  if(inset < 2) inset = 2;
-#endif
-  int right_x = bounds.size.w - inset - corner_w;
-  int bottom_y = bounds.size.h - inset - corner_h;
-  s_corner_rect[CORNER_POS_TL] = GRect(inset,   inset,    corner_w, corner_h);
-  s_corner_rect[CORNER_POS_TR] = GRect(right_x, inset,    corner_w, corner_h);
-  s_corner_rect[CORNER_POS_BL] = GRect(inset,   bottom_y, corner_w, corner_h);
-  s_corner_rect[CORNER_POS_BR] = GRect(right_x, bottom_y, corner_w, corner_h);
-
-  const char *corner_font = big ? FONT_KEY_GOTHIC_18_BOLD : FONT_KEY_GOTHIC_14_BOLD;
+  const char *corner_font = s_big ? FONT_KEY_GOTHIC_18_BOLD : FONT_KEY_GOTHIC_14_BOLD;
   for(int i = 0; i < NUM_CORNERS; i++) {
-    s_corner_layer[i] = text_layer_create(s_corner_rect[i]);
+    s_corner_layer[i] = text_layer_create(bounds);
     GTextAlignment align = (i == CORNER_POS_TR || i == CORNER_POS_BR)
       ? GTextAlignmentRight : GTextAlignmentLeft;
     text_layer_set_text_alignment(s_corner_layer[i], align);
@@ -531,6 +701,11 @@ static void window_load(Window *window) {
     text_layer_set_text_color(s_corner_layer[i], theme_fg());
     text_layer_set_background_color(s_corner_layer[i], GColorClear);
   }
+
+  // Lay everything out against the unobstructed area so the face is correct even
+  // if it launches while a Timeline Quick View peek is already up.
+  relayout(layer_get_unobstructed_bounds(window_layer));
+
   corners_rebuild();
   corners_update();
 }
@@ -540,6 +715,19 @@ static void window_unload(Window *window) {
     app_timer_cancel(s_anim_timer);
     s_anim_timer = NULL;
   }
+
+  unobstructed_area_service_unsubscribe();
+
+#if defined(PBL_HEALTH)
+  if(s_hr_off_timer) {
+    app_timer_cancel(s_hr_off_timer);
+    s_hr_off_timer = NULL;
+  }
+  if(s_heart_path) {
+    gpath_destroy(s_heart_path);
+    s_heart_path = NULL;
+  }
+#endif
 
   layer_destroy(s_canvas_layer);
   layer_destroy(s_bg_layer);
@@ -603,6 +791,13 @@ void main_window_push() {
     .pebble_app_connection_handler = bt_handler
   });
   bt_handler(connection_service_peek_pebble_app_connection());
+
+  // React to a Timeline Quick View peek: re-lay out from the (animated)
+  // unobstructed area so the dial lifts and tightens while the overlay is up.
+  unobstructed_area_service_subscribe((UnobstructedAreaHandlers) {
+    .change = unobstructed_change,
+    .did_change = unobstructed_did_change,
+  }, NULL);
 
   // Begin smooth launch sweep. A timer guarantees the sweep ends even where the
   // animation stopped handler is unreliable.
